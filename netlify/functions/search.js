@@ -1,11 +1,41 @@
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
+/**
+ * Helper: fetch URL on server; if Cloudflare/anti-bot detected or empty, fallback to r.jina.ai extractor.
+ * Returns full text (may be HTML or text-extracted by jina.ai).
+ */
+async function fetchWithFallback(url, headers) {
+  try {
+    const res = await fetch(url, { headers, redirect: 'follow', timeout: 15000 });
+    const text = await res.text();
+    // simple checks for anti-bot / Cloudflare blocks
+    const lower = text.toLowerCase();
+    if (!text || lower.includes('please enable javascript') || lower.includes('cloudflare') || lower.includes('access denied') || lower.includes('error 1020')) {
+      // fallback to jina.ai (free extractor)
+      const fallbackUrl = 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//, '');
+      const fr = await fetch(fallbackUrl, { headers });
+      const ftext = await fr.text();
+      return ftext || text;
+    }
+    return text;
+  } catch (e) {
+    try {
+      const fallbackUrl = 'https://r.jina.ai/http://' + url.replace(/^https?:\/\//, '');
+      const fr = await fetch(fallbackUrl, { headers });
+      const ftext = await fr.text();
+      return ftext || '';
+    } catch (ee) {
+      return '';
+    }
+  }
+}
+
 function parseIMDb(html) {
   const list = [];
   const regex = /<a\s+href="(\/title\/tt\d+\/[^"]*)".*?>([^<]+)<\/a>/gi;
   let m;
   const seen = new Set();
-  while ((m = regex.exec(html)) && list.length < 10) {
+  while ((m = regex.exec(html)) && list.length < 12) {
     const href = m[1];
     const title = m[2].trim();
     if (!seen.has(href)) {
@@ -21,7 +51,7 @@ function parseTMDB(html) {
   const list = [];
   const regex = /<a\s+href="(\/(movie|tv)\/\d+)[^"]*".*?>([^<]+)<\/a>/gi;
   let m; const seen = new Set();
-  while ((m = regex.exec(html)) && list.length < 10) {
+  while ((m = regex.exec(html)) && list.length < 12) {
     const href = m[1];
     const title = m[3].trim();
     if (!seen.has(href)) {
@@ -37,7 +67,7 @@ function parseKinopoisk(html) {
   const list = [];
   const regex = /\/film\/(\d+)\/[^"]*"/gi;
   let m; const seen = new Set();
-  while ((m = regex.exec(html)) && list.length < 10) {
+  while ((m = regex.exec(html)) && list.length < 12) {
     const id = m[1];
     if (!seen.has(id)) {
       seen.add(id);
@@ -57,7 +87,7 @@ function parseLetterboxd(html) {
   const list = [];
   const regex = /<a\s+href="(\/film\/[^"\/]+\/)".*?>([^<]+)<\/a>/gi;
   let m; const seen = new Set();
-  while ((m = regex.exec(html)) && list.length < 10) {
+  while ((m = regex.exec(html)) && list.length < 12) {
     const href = m[1];
     const title = m[2].trim();
     if (!seen.has(href)) {
@@ -83,9 +113,8 @@ exports.handler = async function(event) {
     tasks.push((async () => {
       try {
         const url = 'https://www.imdb.com/find?q=' + encodeURIComponent(q);
-        const r = await fetch(url, { headers });
-        const text = await r.text();
-        return parseIMDb(text);
+        const html = await fetchWithFallback(url, headers);
+        return parseIMDb(html);
       } catch(e) { return []; }
     })());
   }
@@ -94,9 +123,8 @@ exports.handler = async function(event) {
     tasks.push((async () => {
       try {
         const url = 'https://www.themoviedb.org/search?query=' + encodeURIComponent(q);
-        const r = await fetch(url, { headers });
-        const text = await r.text();
-        return parseTMDB(text);
+        const html = await fetchWithFallback(url, headers);
+        return parseTMDB(html);
       } catch(e) { return []; }
     })());
   }
@@ -105,9 +133,8 @@ exports.handler = async function(event) {
     tasks.push((async () => {
       try {
         const url = 'https://www.kinopoisk.ru/index.php?kp_query=' + encodeURIComponent(q);
-        const r = await fetch(url, { headers });
-        const text = await r.text();
-        return parseKinopoisk(text);
+        const html = await fetchWithFallback(url, headers);
+        return parseKinopoisk(html);
       } catch(e) { return []; }
     })());
   }
@@ -116,9 +143,8 @@ exports.handler = async function(event) {
     tasks.push((async () => {
       try {
         const url = 'https://letterboxd.com/search/films/' + encodeURIComponent(q) + '/';
-        const r = await fetch(url, { headers });
-        const text = await r.text();
-        return parseLetterboxd(text);
+        const html = await fetchWithFallback(url, headers);
+        return parseLetterboxd(html);
       } catch(e) { return []; }
     })());
   }

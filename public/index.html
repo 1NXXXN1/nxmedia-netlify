@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>NXMEDIA — Qidiruv (No API)</title>
+  <title>NXMEDIA — Qidiruv (No API, Proxy fallback)</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body{font-family:system-ui,Arial;padding:16px;max-width:900px;margin:auto}
@@ -10,6 +10,7 @@
     img{width:80px;height:120px;object-fit:cover}
     header{display:flex;gap:12px;align-items:center}
     .sources button{margin-right:6px}
+    pre{white-space:pre-wrap;word-break:break-word}
   </style>
 </head>
 <body>
@@ -17,7 +18,7 @@
     <h1>NXMEDIA — Qidiruv (No API)</h1>
   </header>
 
-  <p>Qidiruv (Kinopoisk / IMDb / TMDB / Letterboxd) — serverless scraper orqali. Hech qanday API key kerak emas.</p>
+  <p>Qidiruv (Kinopoisk / IMDb / TMDB / Letterboxd) — server-side proxy + fallback to free public fetcher. Hech qanday API key kerak emas.</p>
 
   <input id="q" placeholder="Film yoki serial nomi..." style="width:100%;padding:10px;font-size:16px"/>
   <div style="margin-top:8px" class="sources">
@@ -33,6 +34,7 @@
   </div>
 
   <div id="results" style="margin-top:14px"></div>
+  <div id="debug" style="margin-top:12px;color:#666"></div>
 
   <script type="module" src="./js/main.js"></script>
 </body>

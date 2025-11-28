@@ -1,5 +1,6 @@
 const qInput = document.getElementById('q');
 const results = document.getElementById('results');
+const debug = document.getElementById('debug');
 const sourceSel = document.getElementById('source');
 const searchBtn = document.getElementById('searchBtn');
 
@@ -15,12 +16,15 @@ qInput.addEventListener('keydown', (e) => {
 
 async function doSearch(q, source='all') {
   results.innerHTML = '<i>Qidirilmoqda...</i>';
+  debug.textContent = 'loading...';
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=${encodeURIComponent(source)}`);
+    const res = await fetch(`/.netlify/functions/search?q=${encodeURIComponent(q)}&source=${encodeURIComponent(source)}`);
     if (!res.ok) throw new Error('Server xatosi ' + res.status);
     const data = await res.json();
+    debug.textContent = 'Received ' + (data.length||0) + ' items';
     renderResults(data, q);
   } catch (e) {
+    debug.textContent = 'Xato: ' + e.message;
     results.innerHTML = '<div style="color:red">Xato: ' + e.message + '</div>';
   }
 }
