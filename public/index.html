@@ -1,41 +1,51 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>NXMEDIA — Qidiruv (No API, Proxy fallback)</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    body{font-family:system-ui,Arial;padding:16px;max-width:900px;margin:auto}
-    .card{display:flex;gap:12px;margin:10px 0;padding:8px;border:1px solid #eee;border-radius:6px}
-    img{width:80px;height:120px;object-fit:cover}
-    header{display:flex;gap:12px;align-items:center}
-    .sources button{margin-right:6px}
-    pre{white-space:pre-wrap;word-break:break-word}
-  </style>
+<meta charset="utf-8"/>
+<title>NXMEDIA — Client-side scraper (No extensions)</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+body{font-family:system-ui,Arial;margin:16px;max-width:900px}
+.card{display:flex;gap:12px;padding:8px;border:1px solid #eee;border-radius:6px;margin:8px 0}
+img{width:80px;height:120px;object-fit:cover}
+.instructions{background:#f9f9f9;padding:12px;border-radius:6px;margin:12px 0}
+.bookmarklet{display:inline-block;padding:8px 10px;background:#222;color:#fff;border-radius:6px;text-decoration:none}
+.debug{color:#666;margin-top:8px}
+</style>
 </head>
 <body>
-  <header>
-    <h1>NXMEDIA — Qidiruv (No API)</h1>
-  </header>
+<h1>NXMEDIA — Client-side scraper</h1>
+<p>Ushbu sayt ikki rejimda ishlaydi (bepul, hech qanday server kaliti kerak emas):</p>
+<ol>
+<li><strong>Avtomatik qidiruv:</strong> sahifadan to'g'ridan-to'g'ri <code>fetch()</code> urinishlari qiladi — <em>lekin</em> ko'pgina saytlar CORS cheklovlari sababli serverdan fetchni bloklaydi. Agar bo'sh javob ko'rsangiz, bookmarkletni ishlating.</li>
+<li><strong>Bookmarklet (tavsiya):</strong> Brauzerning Bookmarks (Yulduzcha) paneliga bookmarkletni qo'shing. Siz film sahifasida bo'lganingizda bookmarkletni bosish bilan sahifadan ma'lumot olinadi va <code>watch.html</code> ochiladi — TAMONPLUGINSIZ va HECH QANDAY EXTENSION talab qilinmaydi.</li>
+</ol>
 
-  <p>Qidiruv (Kinopoisk / IMDb / TMDB / Letterboxd) — server-side proxy + fallback to free public fetcher. Hech qanday API key kerak emas.</p>
+<div class="instructions">
+<h3>1) Bookmarklet qo'shish (1 marta bajarish)</h3>
+<p>Quyidagi ko'k tugmani zichqoncha bilan "drag & drop" qiling yoki bookmark sifatida saqlang:</p>
+<p><a id="bookmarklet" class="bookmarklet" href="#">NXMEDIA: Save & Open</a></p>
+<p>Yoki bookmarklet kodini qo'lda yarating: oching brauzer -> Bookmarks -> Add bookmark, nom: <code>NXMEDIA</code>, URL: quyidagi maydon ichidagi kodni joylang.</p>
+<textarea id="bmcode" style="width:100%;height:160px;margin-top:8px;font-size:12px"></textarea>
+</div>
 
-  <input id="q" placeholder="Film yoki serial nomi..." style="width:100%;padding:10px;font-size:16px"/>
-  <div style="margin-top:8px" class="sources">
-    <label>Manba: </label>
-    <select id="source">
-      <option value="all">Barchasi</option>
-      <option value="imdb">IMDb</option>
-      <option value="kp">Kinopoisk</option>
-      <option value="tmdb">TMDB</option>
-      <option value="lb">Letterboxd</option>
-    </select>
-    <button id="searchBtn">Qidirish</button>
-  </div>
+<div class="instructions">
+<h3>2) Qidiruv (automatic, CORSga bog'liq)</h3>
+<input id="q" placeholder="Film yoki serial nomi..." style="width:70%;padding:8px;font-size:14px"/>
+<select id="source" style="padding:8px">
+  <option value="all">Barchasi</option>
+  <option value="imdb">IMDb</option>
+  <option value="kp">Kinopoisk</option>
+  <option value="tmdb">TMDB</option>
+  <option value="lb">Letterboxd</option>
+</select>
+<button id="search">Qidirish</button>
+<div id="debug" class="debug"></div>
+<div id="results"></div>
+</div>
 
-  <div id="results" style="margin-top:14px"></div>
-  <div id="debug" style="margin-top:12px;color:#666"></div>
+<p style="margin-top:12px;color:#b00"><strong>Eslatma:</strong> Agar qidiruv bo'sh chiqsa, sahifa orqali (IMDb/KP/TMDB/Letterboxd) o'zingiz film sahifasiga o'ting va bookmarkletni bosing — bu hamma kompyuterlarda ishlaydi.</p>
 
-  <script type="module" src="./js/main.js"></script>
+<script type="module" src="./js/main.js"></script>
 </body>
 </html>
