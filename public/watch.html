@@ -1,7 +1,15 @@
 <!doctype html>
 <html>
-<head><meta charset="utf-8"/><title>NXMEDIA — Player</title></head>
+<head><meta charset="utf-8"/><title>NXMEDIA — Player</title>  <link rel="stylesheet" href="/assets/ui.css">
+</head>
 <body style="font-family:system-ui,Arial;padding:16px;max-width:900px;margin:auto">
+<div class="navbar"><div class="inner">
+  <div class="brand"><span class="dot"></span> <span>NX Media</span></div>
+  <div class="actions">
+    <a class="badge" href="/">Home</a>
+  </div>
+</div></div>
+<div class="container">
 <h1 id="title">Yuklanmoqda...</h1>
 <img id="poster" style="max-width:200px;display:block;margin-bottom:12px"/>
 <div id="meta"></div>
@@ -28,5 +36,6 @@
   document.getElementById('meta').textContent = 'TMDB: '+(json.tmdb||'')+' | IMDb: '+(json.imdb||'')+' | KP: '+(json.kp||'');
 })();
 </script>
+</div><div class="footer">© 2025 NX Media</div>
 </body>
 </html>
