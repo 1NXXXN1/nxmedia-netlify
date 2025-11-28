@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>NXMEDIA — Qidiruv (No API)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Arial;padding:16px;max-width:900px;margin:auto}
+    .card{display:flex;gap:12px;margin:10px 0;padding:8px;border:1px solid #eee;border-radius:6px}
+    img{width:80px;height:120px;object-fit:cover}
+    header{display:flex;gap:12px;align-items:center}
+    .sources button{margin-right:6px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NXMEDIA — Qidiruv (No API)</h1>
+  </header>
+
+  <p>Qidiruv (Kinopoisk / IMDb / TMDB / Letterboxd) — serverless scraper orqali. Hech qanday API key kerak emas.</p>
+
+  <input id="q" placeholder="Film yoki serial nomi..." style="width:100%;padding:10px;font-size:16px"/>
+  <div style="margin-top:8px" class="sources">
+    <label>Manba: </label>
+    <select id="source">
+      <option value="all">Barchasi</option>
+      <option value="imdb">IMDb</option>
+      <option value="kp">Kinopoisk</option>
+      <option value="tmdb">TMDB</option>
+      <option value="lb">Letterboxd</option>
+    </select>
+    <button id="searchBtn">Qidirish</button>
+  </div>
+
+  <div id="results" style="margin-top:14px"></div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
