@@ -1,4 +1,4 @@
-export async function handler(event) {
+export async function handler(event){
   const path = event.queryStringParameters.path || "";
   const query = event.queryStringParameters.query || "";
   const url = "https://kinopoiskapiunofficial.tech/api/" + path + (query ? "?" + query : "");

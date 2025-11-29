@@ -2,39 +2,39 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>NxMedia Full Deploy</title>
+<title>NxMedia — Final Deploy</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>NxMedia — Full Reconstructed Kino Platform</header>
+<header>NxMedia — Kino Izlash</header>
 
 <div class="search-box">
-  <input id="q" placeholder="Film nomi...">
-  <button onclick="doSearch()">Qidirish</button>
+ <input id="q" placeholder="Film nomi...">
+ <button onclick="searchMovie()">Qidirish</button>
 </div>
 
-<div id="result"></div>
-
+<div id="output"></div>
 <div id="player"></div>
 
 <script src="player.js"></script>
 <script src="bundle.js"></script>
 
 <script>
-async function doSearch(){
-    const q=document.getElementById("q").value.trim();
-    if(!q) return;
-    const res=await smartSearch(q);
-    if(!res.items.length){
-        document.getElementById("result").innerHTML="Topilmadi";
-        return;
-    }
-    const movie=res.items[0];
-    document.getElementById("result").innerHTML="<h2>"+movie.title+"</h2>";
-    const full=await getFullMovie({kpId: movie.kpId});
-    const pc=new PlayerController(full.players);
-    pc.autoSelect();
+async function searchMovie(){
+  const q=document.getElementById("q").value.trim();
+  if(!q) return;
+  document.getElementById("output").innerHTML="Qidirilmoqda...";
+  const res=await smartSearch(q);
+  if(!res.items.length){
+    document.getElementById("output").innerHTML="Topilmadi";
+    return;
+  }
+  const movie=res.items[0];
+  document.getElementById("output").innerHTML="<h2>"+movie.title+"</h2>";
+  const full=await getFullMovie({kpId:movie.kpId});
+  const pc=new PlayerController(full.players);
+  pc.autoSelect();
 }
 </script>
 
