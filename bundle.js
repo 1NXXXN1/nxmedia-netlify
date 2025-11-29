@@ -1,7 +1,6 @@
-// FULL bundle.js — Variant B with autoSelect alias
-// KinoHub CLONE level: Kinobox direct, KP via /kp proxy, robust normalizers, smartSearch, popular, getFullMovie, player resolver, safe guards
+// FIXED FULL bundle.js — Variant B final (no recursive exports, autoSelect alias)
 
-// ---------- Core HTTP + Retry + Timeout ----------
+// --- Core HTTP ---
 const TIMEOUT = 10000, MAX_RETRY = 3;
 const inflight = new Map();
 function withTimeout(promise, ms = TIMEOUT) {
@@ -29,101 +28,45 @@ async function http(url, opts = {}, retry = 0) {
   return exec;
 }
 
-// ---------- Cache (TTL + simple LRU) ----------
-class Cache { constructor(ttl=3*60*1000, max=1000){ this.ttl=ttl; this.max=max; this.map=new Map(); }
-  _isExpired(e){ return Date.now() - e.time > this.ttl; }
+// --- Cache ---
+class Cache { constructor(ttl=5*60*1000,max=500){ this.ttl=ttl; this.max=max; this.map=new Map(); }
+  _isExpired(e){ return Date.now()-e.time>this.ttl; }
   get(k){ const e=this.map.get(k); if(!e) return null; if(this._isExpired(e)){ this.map.delete(k); return null; } this.map.delete(k); this.map.set(k,e); return e.value; }
   set(k,v){ if(this.map.size>=this.max){ const first=this.map.keys().next().value; this.map.delete(first); } this.map.set(k,{value:v,time:Date.now()}); }
 }
-const cache = new Cache(5*60*1000, 200);
+const cache = new Cache();
 
-// ---------- Kinobox API (DIRECT) ----------
+// --- Kinobox (direct) ---
 const KB_BASE = "https://api.kinobox.tv/api";
 async function kbGet(path, params={}){
   const q = new URLSearchParams(params).toString();
   const url = KB_BASE + path + (q ? "?" + q : "");
   return http(url);
 }
-function kbGetMovie(id){ return kbGet(`/movies/${id}`); }
-function kbGetPlayers(kinopoiskId){ return kbGet(`/players`, { kinopoisk: kinopoiskId }); }
-function kbSearch(query){ return kbGet(`/movies/search/`, { query }); }
-function kbPopular(page=1){ return kbGet(`/popular`, { page }); }
-function kbEpisodes(id){ return kbGet(`/episodes/${id}`); }
-function kbSimilarByKBId(id){ return kbGet(`/similar/${id}`); }
+async function kbGetMovie(id){ return kbGet(`/movies/${id}`); }
+async function kbGetPlayers(kinopoiskId){ return kbGet(`/players`, { kinopoisk: kinopoiskId }); }
+async function kbSearch(query){ return kbGet(`/movies/search/`, { query }); }
+async function kbPopularInner(page=1){ return kbGet(`/popular`, { page }); }
+async function kbEpisodes(id){ return kbGet(`/episodes/${id}`); }
+async function kbSimilarByKBId(id){ return kbGet(`/similar/${id}`); }
 
-// ---------- Kinopoisk proxy via /kp (server-side) ----------
+// --- KP proxy helpers (/kp) ---
 function kpPath(path, extra=""){ return '/kp?path=' + encodeURIComponent(path) + (extra? '&'+extra : ''); }
 async function kpSearch(query){ return http(kpPath("v2.1/films/search-by-keyword", "keyword="+encodeURIComponent(query))); }
 async function kpGetMovie(id){ return http(kpPath("v2.2/films/"+encodeURIComponent(id))); }
 async function kpGetSimilar(id){ return http(kpPath("v2.2/films/"+encodeURIComponent(id)+"/similars")); }
 
-// ---------- Normalizers ----------
-const g = (o,k,d=null)=>(o && o[k]!==undefined ? o[k] : d);
-function normalizeTitleAny(obj){
-  if(!obj) return "";
-  if(typeof obj === "string") return obj;
-  return g(obj,"russian")||g(obj,"nameRu")||g(obj,"name")||g(obj,"title")||g(obj,"original")||"";
-}
-function normalizeKBMovie(raw){
-  if(!raw) return null;
-  const title = normalizeTitleAny(raw.title || raw);
-  return {
-    id: g(raw,"id") || g(raw,"movieId") || g(raw,"filmId") || null,
-    kpId: g(raw,"kinopoiskId") || g(raw,"kinopoisk_id") || g(raw,"kp_id") || null,
-    imdbId: g(raw,"imdb") || g(raw,"imdbId") || null,
-    title,
-    originalTitle: g(raw,"originalTitle") || g(raw,"orig_title") || null,
-    year: g(raw,"year") || null,
-    description: g(raw,"description") || g(raw,"desc") || null,
-    poster: g(raw,"poster") || g(raw,"posterPreview") || g(raw,"poster_url") || null,
-    genres: g(raw,"genres") || [],
-    countries: g(raw,"countries") || [],
-    rating: { kp: g(raw,"rating_kp"), imdb: g(raw,"rating_imdb"), kinobox: g(raw,"rating") },
-    isSeries: !!g(raw,"isSeries") || (g(raw,"type")==="series"),
-    raw
-  };
-}
-function normalizeKPItem(item){
-  if(!item) return null;
-  return {
-    source:"kp",
-    id: item.filmId || item.id || null,
-    kpId: item.filmId || null,
-    title: item.nameRu || item.nameOriginal || item.nameEn || item.name || "",
-    poster: item.posterUrlPreview || item.posterUrl || null,
-    year: item.year || null,
-    raw: item
-  };
-}
-function normalizeKPMovie(raw){
-  if(!raw) return null;
-  return {
-    source:"kp",
-    id: g(raw,"filmId") || g(raw,"kinopoiskId") || null,
-    kpId: g(raw,"filmId") || g(raw,"kinopoiskId") || null,
-    imdbId: g(raw,"imdbId") || null,
-    title: normalizeTitleAny({ russian: g(raw,"nameRu"), name: g(raw,"nameOriginal") }),
-    originalTitle: g(raw,"nameOriginal") || g(raw,"nameEn") || null,
-    year: g(raw,"year") || null,
-    description: g(raw,"shortDescription") || g(raw,"description") || null,
-    poster: g(raw,"posterUrl") || g(raw,"posterUrlPreview") || null,
-    genres: (g(raw,"genres")||[]).map(x => typeof x==='string'?x:(x.genre||x.name)).filter(Boolean),
-    countries: g(raw,"countries") || [],
-    rating: { kp: g(raw,"rating") || g(raw,"ratingKinopoisk"), imdb: g(raw,"ratingImdb") },
-    isSeries: !!g(raw,"serial") || !!g(raw,"isSeries"),
-    raw
-  };
-}
+// --- Normalizers ---
+const g=(o,k,d=null)=>(o && o[k]!==undefined ? o[k] : d);
+function normalizeTitleAny(obj){ if(!obj) return ""; if(typeof obj==="string") return obj; return g(obj,"russian")||g(obj,"nameRu")||g(obj,"name")||g(obj,"title")||g(obj,"original")||""; }
+function normalizeKBMovie(raw){ if(!raw) return null; const title = normalizeTitleAny(raw.title||raw); return { id: g(raw,"id")||g(raw,"movieId")||g(raw,"filmId")||null, kpId: g(raw,"kinopoiskId")||g(raw,"kinopoisk_id")||g(raw,"kp_id")||null, imdbId: g(raw,"imdb")||g(raw,"imdbId")||null, title, originalTitle: g(raw,"originalTitle")||g(raw,"orig_title")||null, year: g(raw,"year")||null, description: g(raw,"description")||g(raw,"desc")||null, poster: g(raw,"poster")||g(raw,"posterPreview")||g(raw,"poster_url")||null, genres: g(raw,"genres")||[], countries: g(raw,"countries")||[], rating:{ kp:g(raw,"rating_kp"), imdb:g(raw,"rating_imdb"), kinobox:g(raw,"rating") }, isSeries: !!g(raw,"isSeries") || (g(raw,"type")==="series"), raw }; }
+function normalizeKPMovie(raw){ if(!raw) return null; return { source:"kp", id: g(raw,"filmId")||g(raw,"kinopoiskId")||null, kpId: g(raw,"filmId")||g(raw,"kinopoiskId")||null, imdbId: g(raw,"imdbId")||null, title: normalizeTitleAny({ russian: g(raw,"nameRu"), name: g(raw,"nameOriginal") }), originalTitle: g(raw,"nameOriginal")||g(raw,"nameEn")||null, year: g(raw,"year")||null, description: g(raw,"shortDescription")||g(raw,"description")||null, poster: g(raw,"posterUrl")||g(raw,"posterUrlPreview")||null, genres: (g(raw,"genres")||[]).map(x=> typeof x==='string'?x:(x.genre||x.name)).filter(Boolean), countries: g(raw,"countries")||[], rating: { kp: g(raw,"rating")||g(raw,"ratingKinopoisk"), imdb: g(raw,"ratingImdb") }, isSeries: !!g(raw,"serial")||!!g(raw,"isSeries"), raw }; }
+function normalizeSearchList(raw){ if(!raw) return []; if(Array.isArray(raw)) return raw.map(normalizeKBMovie); if(raw.data && Array.isArray(raw.data.items)) return raw.data.items.map(normalizeKBMovie); if(raw.items && Array.isArray(raw.items)) return raw.items.map(normalizeKBMovie); if(raw.results && Array.isArray(raw.results)) return raw.results.map(normalizeKBMovie); return []; }
+function normalizePlayers(raw){ if(!raw) return []; const list = raw.playlist || raw.data || raw.players || raw; if(!Array.isArray(list)) return []; return list.map(p=>({ id:p.id||null, name:p.name||p.title||"Player", iframe:p.iframe||p.src||p.url||p.file||null, quality:p.quality||null, provider:p.provider||p.host||null, raw:p })); }
+function normalizeEpisodes(raw){ if(!raw) return []; if(raw.seasons) return raw.seasons; if(raw.data && raw.data.seasons) return raw.data.seasons; return raw; }
+function normalizeSimilar(raw){ const items = raw && (raw.items || raw.data && raw.data.items || raw.similar) || []; return (Array.isArray(items)? items:[]).map(normalizeKPMovie); }
 
-// ---------- Players normalizer ----------
-function normalizePlayers(raw){
-  if(!raw) return [];
-  const list = raw.playlist || raw.data || raw.players || raw;
-  if(!Array.isArray(list)) return [];
-  return list.map(p=>({ id:p.id||null, name:p.name||p.title||"Player", iframe:p.iframe||p.src||p.url||p.file||null, quality:p.quality||null, provider:p.provider||p.host||null, raw:p }));
-}
-
-// ---------- Smart Search (KP primary -> KB fallback) ----------
+// --- Smart Search ---
 async function smartSearch(query, opts={}){
   if(!query || !String(query).trim()) return { source:"none", items:[] };
   const key = 'smart:'+query+':'+(opts.page||1)+':'+(opts.forceKB?1:0);
@@ -132,7 +75,7 @@ async function smartSearch(query, opts={}){
     try{
       const kpR = await kpSearch(query);
       if(kpR && Array.isArray(kpR.films) && kpR.films.length){
-        const items = kpR.films.map(normalizeKPItem);
+        const items = kpR.films.map(normalizeKPMovie);
         const out = { source:"kp", items };
         cache.set(key,out); return out;
       }
@@ -145,16 +88,8 @@ async function smartSearch(query, opts={}){
     cache.set(key,out); return out;
   }catch(e){ console.warn("kbSearch err", e && e.message); return { source:"none", items:[] }; }
 }
-function normalizeSearchList(raw){
-  if(!raw) return [];
-  if(Array.isArray(raw)) return raw.map(normalizeKBMovie);
-  if(raw.data && Array.isArray(raw.data.items)) return raw.data.items.map(normalizeKBMovie);
-  if(raw.items && Array.isArray(raw.items)) return raw.items.map(normalizeKBMovie);
-  if(raw.results && Array.isArray(raw.results)) return raw.results.map(normalizeKBMovie);
-  return [];
-}
 
-// ---------- getFullMovie (merge KP + KB + players + episodes + similar) ----------
+// --- getFullMovie ---
 async function getFullMovie({ kpId=null, kbId=null, prefer="kp" }={}){
   if(!kpId && !kbId) throw new Error("getFullMovie requires kpId or kbId");
   const key = `full:${kpId||''}:${kbId||''}:${prefer}`;
@@ -167,10 +102,7 @@ async function getFullMovie({ kpId=null, kbId=null, prefer="kp" }={}){
     try{ kb = normalizeKBMovie(await kbGetMovie(kbId)); }catch(e){ console.warn("kbGetMovie failed", e && e.message); }
   }
   try{ const rawPlayers = await kbGetPlayers(kpId || kbId); players = normalizePlayers(rawPlayers); }catch(e){ /* ignore */ }
-  try{
-    if(kb && kb.id) episodes = normalizeEpisodes(await kbEpisodes(kb.id));
-    else if(kp && kp.isSeries) episodes = normalizeEpisodes((await kpGetMovie(kpId))?.seasons || null);
-  }catch(e){ /* ignore */ }
+  try{ if(kb && kb.id) episodes = normalizeEpisodes(await kbEpisodes(kb.id)); else if(kp && kp.isSeries) episodes = normalizeEpisodes((await kpGetMovie(kpId))?.seasons || null); }catch(e){ /* ignore */ }
   try{
     if(kpId){
       const rawSim = await kpGetSimilar(kpId);
@@ -190,43 +122,21 @@ async function getFullMovie({ kpId=null, kbId=null, prefer="kp" }={}){
   return out;
 }
 
-// ---------- Player providers / resolver / controller ----------
-const Providers = [ { key:"kodik", detect: u => !!u && u.includes("kodik"), priority: 1 }, { key:"videocdn", detect: u => !!u && u.includes("videocdn"), priority: 2 }, { key:"collaps", detect: u => !!u && u.includes("collaps"), priority: 3 }, { key:"hdvb", detect: u => !!u && u.includes("hdvb"), priority: 4 }, { key:"moonwalk", detect: u => !!u && u.includes("moonwalk"), priority: 5 }, { key:"unknown", detect: _=>true, priority:999 } ];
+// --- Providers/PlayerController ---
+const Providers=[ {key:"kodik",detect:u=>!!u&&u.includes("kodik"),priority:1},{key:"videocdn",detect:u=>!!u&&u.includes("videocdn"),priority:2},{key:"collaps",detect:u=>!!u&&u.includes("collaps"),priority:3},{key:"hdvb",detect:u=>!!u&&u.includes("hdvb"),priority:4},{key:"moonwalk",detect:u=>!!u&&u.includes("moonwalk"),priority:5},{key:"unknown",detect:_=>true,priority:999} ];
 function detectProvider(url){ return Providers.find(p=>p.detect(url)) || Providers[Providers.length-1]; }
-function testIframe(url, timeout=3500){
-  return new Promise(resolve=>{
-    if(!url){ resolve(false); return; }
-    const iframe = document.createElement('iframe'); iframe.style.display='none'; iframe.src = url;
-    let done=false;
-    const timer = setTimeout(()=>{ if(!done){ done=true; try{ iframe.remove(); }catch(e){} resolve(false); } }, timeout);
-    iframe.onload = ()=>{ if(!done){ done=true; try{ iframe.remove(); }catch(e){} resolve(true); } };
-    document.body.appendChild(iframe);
-  });
-}
-async function resolveBestPlayer(players){
-  if(!Array.isArray(players) || !players.length) return null;
-  const sorted = players.map(p=>({...p, provider: detectProvider(p.iframe)})).sort((a,b)=>a.provider.priority - b.provider.priority);
-  for(const p of sorted){
-    try{ if(p.iframe && await testIframe(p.iframe)) return p; }catch(e){} }
-  return null;
-}
-class PlayerController {
-  constructor(players){ this.players = players || []; this.current = -1; this.listeners = { load:[], error:[], change:[] }; }
-  on(ev,fn){ if(this.listeners[ev]) this.listeners[ev].push(fn); }
-  emit(ev,data){ (this.listeners[ev]||[]).forEach(fn=>{ try{ fn(data);}catch(e){} }); }
-  async auto(){ const best = await resolveBestPlayer(this.players); if(!best){ this.emit('error','No working iframe'); return; } const idx = this.players.findIndex(p=>p===best); this.load(idx); }
-  autoSelect(){ return this.auto(); } // alias for compatibility
-  load(i){ if(i<0||i>=this.players.length) return; this.current=i; const p=this.players[i]; this.emit('change',p); const old=document.getElementById('player-iframe'); if(old) old.remove(); const el=document.createElement('iframe'); el.id='player-iframe'; el.src = p.iframe; el.allowFullscreen = true; el.onload = ()=> this.emit('load', p); document.getElementById('player').appendChild(el); }
-  next(){ if(this.current+1 < this.players.length) this.load(this.current+1); }
-  prev(){ if(this.current-1 >= 0) this.load(this.current-1); }
-}
+function testIframe(url, timeout=3500){ return new Promise(resolve=>{ if(!url){ resolve(false); return; } const iframe=document.createElement('iframe'); iframe.style.display='none'; iframe.src=url; let done=false; const timer=setTimeout(()=>{ if(!done){ done=true; try{ iframe.remove(); }catch(e){} resolve(false); } }, timeout); iframe.onload=()=>{ if(!done){ done=true; try{ iframe.remove(); }catch(e){} resolve(true); } }; document.body.appendChild(iframe); }); }
+async function resolveBestPlayer(players){ if(!Array.isArray(players)||!players.length) return null; const sorted=players.map(p=>({...p,provider:detectProvider(p.iframe)})).sort((a,b)=>a.provider.priority-b.provider.priority); for(const p of sorted){ try{ if(p.iframe && await testIframe(p.iframe)) return p; }catch(e){} } return null; }
+class PlayerController{ constructor(players){ this.players=players||[]; this.current=-1; this.listeners={load:[],error:[],change:[]}; } on(ev,fn){ if(this.listeners[ev]) this.listeners[ev].push(fn);} emit(ev,d){ (this.listeners[ev]||[]).forEach(fn=>{ try{ fn(d); }catch(e){} }); } async auto(){ const best=await resolveBestPlayer(this.players); if(!best){ this.emit('error','No working iframe'); return; } const idx=this.players.findIndex(p=>p===best); this.load(idx); } autoSelect(){ return this.auto(); } load(i){ if(i<0||i>=this.players.length) return; this.current=i; const p=this.players[i]; this.emit('change',p); const old=document.getElementById('player-iframe'); if(old) old.remove(); const el=document.createElement('iframe'); el.id='player-iframe'; el.src=p.iframe; el.allowFullscreen = true; el.onload = ()=> this.emit('load', p); document.getElementById('player').appendChild(el); } next(){ if(this.current+1 < this.players.length) this.load(this.current+1); } prev(){ if(this.current-1 >= 0) this.load(this.current-1); } }
 
-// ---------- exports for UI ----------
-window.kbPopular = async function(page=1){ try{ return await kbPopular(page); }catch(e){ console.warn("kbPopular err", e && e.message); return []; } };
+// --- Exports (correct, no recursion) ---
+window._kbPopularImpl = kbPopularInner; // keep internal reference
+window.kbPopular = async function(page=1){
+  try{ return await window._kbPopularImpl(page); }catch(e){ console.warn("kbPopular err", e && e.message); return []; }
+};
 window.smartSearch = smartSearch;
 window.getFullMovie = getFullMovie;
 window.PlayerController = PlayerController;
 window.normalizeKBMovie = normalizeKBMovie;
 
-// safety flag
 window._bundle_ready = true;
