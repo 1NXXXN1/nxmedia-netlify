@@ -1,42 +1,117 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>NxMedia — Final Deploy</title>
-<link rel="stylesheet" href="style.css">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>NxMedia — KinoHub style</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
+<header class="topbar">
+  <div class="brand">NxMedia</div>
+  <div class="search">
+    <input id="q" placeholder="Поиск фильмов..." />
+    <button id="btnSearch">Найти</button>
+  </div>
+</header>
 
-<header>NxMedia — Kino Izlash</header>
+<main id="app">
+  <div id="home" class="page active">
+    <section class="hero">
+      <h1>Популярные фильмы</h1>
+      <div id="popular" class="cards"></div>
+    </section>
+    <section class="results">
+      <h2>Результаты поиска</h2>
+      <div id="results" class="cards"></div>
+    </section>
+  </div>
 
-<div class="search-box">
- <input id="q" placeholder="Film nomi...">
- <button onclick="searchMovie()">Qidirish</button>
-</div>
+  <div id="movie" class="page">
+    <div class="movie-grid">
+      <div class="poster-side">
+        <img id="movie-poster" src="" alt="poster" />
+      </div>
+      <div class="info-side">
+        <h1 id="movie-title"></h1>
+        <p id="movie-year"></p>
+        <p id="movie-desc"></p>
+        <div id="player"></div>
+        <div class="player-controls" id="player-controls"></div>
+      </div>
+    </div>
+    <section>
+      <h3>Похожие фильмы</h3>
+      <div id="similar" class="cards"></div>
+    </section>
+  </div>
+</main>
 
-<div id="output"></div>
-<div id="player"></div>
+<footer class="footer">NxMedia — demo</footer>
 
 <script src="player.js"></script>
 <script src="bundle.js"></script>
-
 <script>
-async function searchMovie(){
-  const q=document.getElementById("q").value.trim();
-  if(!q) return;
-  document.getElementById("output").innerHTML="Qidirilmoqda...";
-  const res=await smartSearch(q);
-  if(!res.items.length){
-    document.getElementById("output").innerHTML="Topilmadi";
-    return;
-  }
-  const movie=res.items[0];
-  document.getElementById("output").innerHTML="<h2>"+movie.title+"</h2>";
-  const full=await getFullMovie({kpId:movie.kpId});
-  const pc=new PlayerController(full.players);
-  pc.autoSelect();
-}
-</script>
+// simple router
+function showPage(name){ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(name).classList.add('active'); }
 
+// render helper
+function makeCard(item){
+  const el=document.createElement('div'); el.className='card';
+  el.innerHTML = `<img src="${item.poster||''}" alt="poster"/><div class="card-title">${item.title||item.name||''}</div>`;
+  el.onclick = ()=> showMoviePage(item);
+  return el;
+}
+
+async function loadPopular(){
+  try{
+    const res = await kbPopular(1);
+    const items = (res?.data?.items || res?.items || res) || [];
+    const container=document.getElementById('popular');
+    container.innerHTML='';
+    items.slice(0,12).forEach(it=> container.appendChild(makeCard(normalizeKBMovie(it))));
+  }catch(e){ console.warn(e); }
+}
+
+async function doSearch(q){
+  const out=document.getElementById('results');
+  out.innerHTML='Загрузка...';
+  const r = await smartSearch(q);
+  out.innerHTML='';
+  for(const it of r.items.slice(0,12)){
+    out.appendChild(makeCard(it));
+  }
+  showPage('home');
+}
+
+document.getElementById('btnSearch').addEventListener('click', ()=> doSearch(document.getElementById('q').value));
+document.getElementById('q').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(e.target.value); });
+
+async function showMoviePage(item){
+  // item may be normalized from kp or kb
+  const kpId = item.kpId || item.id;
+  // fetch full merged movie
+  const full = await getFullMovie({kpId: kpId});
+  const m = full.merged;
+  document.getElementById('movie-poster').src = m.poster || '';
+  document.getElementById('movie-title').textContent = m.title || '';
+  document.getElementById('movie-year').textContent = m.year || '';
+  document.getElementById('movie-desc').textContent = m.description || '';
+  // render similar
+  const sim=document.getElementById('similar'); sim.innerHTML='';
+  (full.similar||[]).slice(0,8).forEach(s=> sim.appendChild(makeCard(s)));
+  // init player
+  document.getElementById('player').innerHTML='';
+  const pc = new PlayerController(full.players || []);
+  pc.on && pc.on('load', p=> console.log('player loaded',p));
+  pc.on && pc.on('error', e=> console.warn('player error',e));
+  pc.autoSelect();
+  showPage('movie');
+}
+
+window.addEventListener('load', async ()=>{
+  await loadPopular();
+});
+</script>
 </body>
 </html>

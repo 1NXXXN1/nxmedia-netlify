@@ -1,13 +1,11 @@
 [build]
-publish="."
-functions="netlify/functions"
-
+  publish = "."
+  functions = "netlify/functions"
 [[redirects]]
-from="/kp"
-to="/.netlify/functions/kp"
-status=200
-
+  from = "/kp"
+  to = "/.netlify/functions/kp"
+  status = 200
 [[redirects]]
-from="/kinobox"
-to="/.netlify/functions/kinobox"
-status=200
+  from = "/kinobox"
+  to = "/.netlify/functions/kinobox"
+  status = 200

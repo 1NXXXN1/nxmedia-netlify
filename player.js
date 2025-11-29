@@ -1,2 +1,2 @@
-// placeholder player init
-console.log("player.js loaded");
+// minimal player stub (keeps existing player.js behavior)
+console.log('player stub loaded');
