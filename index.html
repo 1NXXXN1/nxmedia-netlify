@@ -1,119 +1,41 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NxMedia — Kinopoisk + Kinobox (fallback)</title>
+<meta charset="UTF-8">
+<title>NxMedia Full Deploy</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<header>NxMedia — Kino Qidirish (KP primary, Kinobox fallback)</header>
+<header>NxMedia — Full Reconstructed Kino Platform</header>
 
-<div class="search-container">
-  <input id="q" placeholder="Film nomi..." />
-  <button id="btnSearch">Qidirish</button>
+<div class="search-box">
+  <input id="q" placeholder="Film nomi...">
+  <button onclick="doSearch()">Qidirish</button>
 </div>
 
-<div id="movie-info"></div>
+<div id="result"></div>
 
-<div id="container">
-  <div id="title"></div>
-  <div id="player"></div>
-  <div id="version"></div>
-  <div id="content"></div>
-  <div id="sources"></div>
-  <div id="background"></div>
-
-  <template id="initialization-error-message"></template>
-  <template id="script-error-message"></template>
-  <template id="script-outdated-message"><span class="script-version"></span></template>
-  <template id="server-unavailable-message"></template>
-</div>
+<div id="player"></div>
 
 <script src="player.js"></script>
-<script src="kinopoisk-api.js"></script>
-<script src="kinobox-api.js"></script>
+<script src="bundle.js"></script>
 
 <script>
-document.getElementById('btnSearch').addEventListener('click', searchMovie);
-document.getElementById('q').addEventListener('keydown', function(e){ if(e.key==='Enter') searchMovie(); });
-
-async function searchMovie() {
-  const q = document.getElementById('q').value.trim();
-  if(!q) return;
-  document.getElementById('movie-info').innerHTML = 'Qidirilmoqda...';
-
-  // 1) Try Kinopoisk Unofficial API (primary)
-  try {
-    const kpRes = await kpSearch(q);
-    if (kpRes && kpRes.films && kpRes.films.length) {
-      const film = kpRes.films[0];
-      showBasicInfoFromKP(film);
-      initPlayerWithKP(film.filmId, film.nameRu || film.nameOriginal || film.nameEn || '');
-      return;
-    }
-  } catch(e) {
-    console.warn('KP search failed, falling back to Kinobox search', e);
-  }
-
-  // 2) Fallback to Kinobox search
-  try {
-    const kb = await kinoboxSearch(q);
-    // Kinobox returns e.g. { data: { items: [...] } } or array depending on endpoint; handle common shapes
-    let items = null;
-    if (Array.isArray(kb)) items = kb;
-    else if (kb && kb.data && Array.isArray(kb.data.items)) items = kb.data.items;
-    else if (kb && kb.items) items = kb.items;
-    if (items && items.length) {
-      const first = items[0];
-      // Kinobox movie id fields may be different; try to pick kinopoisk id or movie id
-      const kpId = first.kinopoiskId || first.kinopoisk_id || first.id || first.movieId || first.filmId;
-      const title = first.title && (first.title.russian || first.title.russianName || first.title) || first.name || first.nameRu || first.titleOriginal || '';
-      showBasicInfoFromKinobox(first, title);
-      if (kpId) {
-        initPlayerWithKP(kpId, title);
+async function doSearch(){
+    const q=document.getElementById("q").value.trim();
+    if(!q) return;
+    const res=await smartSearch(q);
+    if(!res.items.length){
+        document.getElementById("result").innerHTML="Topilmadi";
         return;
-      } else if (first.id) {
-        // try to use Kinobox movie id to fetch players via kinobox API
-        try {
-          const players = await kinoboxGetMovie(first.id);
-          console.log('players by movie id', players);
-          // attempt to init via movie id by calling init with kinopoisk absent — many players expect kinopoisk id only, so fallback to direct iframe
-          // if players contain iframeUrl, open first
-          if (players && players.iframeUrl) {
-            document.getElementById('player').innerHTML = '<iframe src="'+players.iframeUrl+'" allowfullscreen></iframe>';
-            return;
-          }
-        } catch(e){ console.warn(e); }
-      }
     }
-    document.getElementById('movie-info').innerHTML = '<h3>Topilmadi</h3>';
-  } catch(e) {
-    console.error('Kinobox search failed', e);
-    document.getElementById('movie-info').innerHTML = '<h3>Xatolik</h3>';
-  }
+    const movie=res.items[0];
+    document.getElementById("result").innerHTML="<h2>"+movie.title+"</h2>";
+    const full=await getFullMovie({kpId: movie.kpId});
+    const pc=new PlayerController(full.players);
+    pc.autoSelect();
 }
-
-function showBasicInfoFromKP(film) {
-  const title = film.nameRu || film.nameOriginal || film.nameEn || '';
-  document.getElementById('movie-info').innerHTML = `<h2>${escapeHtml(title)}</h2><img class="poster" src="${film.posterUrlPreview || film.posterUrl}" />`;
-}
-
-function showBasicInfoFromKinobox(item, title) {
-  document.getElementById('movie-info').innerHTML = `<h2>${escapeHtml(title)}</h2>${ item.posterPreview ? '<img class="poster" src="'+item.posterPreview+'"/>' : '' }`;
-}
-
-function initPlayerWithKP(kpId, title) {
-  // Use player.js init which expects kinopoisk id
-  try {
-    init({ kinopoisk: String(kpId), title: title });
-  } catch(e) {
-    console.error('init failed', e);
-  }
-}
-
-function escapeHtml(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 
 </body>
