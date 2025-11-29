@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>NxMedia Kino</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<header>NxMedia — Kino Qidirish</header>
+<div class="search-container">
+<input id="q" placeholder="Film nomi...">
+<button onclick="searchMovie()">Qidirish</button>
+</div>
+<div id="movie-info"></div>
+
+<div id="container">
+<div id="title"></div>
+<div id="player"></div>
+<div id="version"></div>
+<div id="content"></div>
+<div id="sources"></div>
+<div id="background"></div>
+<template id="initialization-error-message"></template>
+<template id="script-error-message"></template>
+<template id="script-outdated-message"><span class="script-version"></span></template>
+<template id="server-unavailable-message"></template>
+</div>
+
+<script src="player.js"></script>
+
+<script>
+async function searchMovie(){
+ const q=document.getElementById('q').value.trim();
+ if(!q) return;
+ const res=await fetch(`/kp?path=v2.1/films/search-by-keyword&query=keyword=${encodeURIComponent(q)}`);
+ const data=await res.json();
+ if(!data.films||!data.films.length){
+   document.getElementById('movie-info').innerHTML='<h3>Topilmadi</h3>';
+   return;
+ }
+ const f=data.films[0];
+ const kpId=f.filmId;
+ const title=f.nameRu||f.nameOriginal||"";
+ document.getElementById('movie-info').innerHTML=
+  `<h2>${title}</h2><img class='poster' src='${f.posterUrl}'/>`;
+ init({ kinopoisk:String(kpId), title:title });
+}
+</script>
+
+</body></html>
